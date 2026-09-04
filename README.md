@@ -1,4 +1,4 @@
-# Tutorial SageMath + CoCalc — Método Simplex Interativo e Renderização LaTeX
+# Tutorial SageMath + CoCalc — Método Simplex Interativo, Renderização LaTeX e Simplex Duas Fases
 
 Este repositório apresenta um tutorial para utilização do **SageMath no CoCalc** na resolução de problemas de **Programação Linear pelo Método Simplex**.
 
@@ -27,6 +27,7 @@ Além da correção da renderização, o tutorial apresenta um exemplo prático 
 - [Alteração permanente no código-fonte do SageMath](#alteração-permanente-no-código-fonte-do-sagemath)
 - [Proposta de correção](#proposta-de-correção)
 - [Por que utilizar `_repr_latex_()`?](#por-que-utilizar-_repr_latex_)
+- [Simplex Duas Fases](#Método-Simplex-das-Duas-Fases)
 - [Limitações](#limitações)
 - [Referências](#referências)
 - [Licença](#licença)
@@ -564,6 +565,550 @@ Essa distinção é importante para o problema tratado neste projeto.
 Uma representação LaTeX válida para um compilador LaTeX tradicional não necessariamente será processada da mesma forma pelo MathJax utilizado em um notebook.
 
 Por isso, a correção proposta atua principalmente na camada de apresentação.
+
+---
+
+
+# Método Simplex das Duas Fases
+
+Além do **Método Simplex Interativo**, este projeto também disponibiliza uma implementação do **Método Simplex das Duas Fases**, desenvolvida para trabalhar de forma integrada com as estruturas do `interactive_simplex_method` do SageMath.
+
+A implementação está disponível no arquivo:
+
+```text
+simplex_duas_fases.py
+```
+
+e possui um exemplo completo no notebook:
+
+```text
+Exemplo_Simplex_Duas_Fases.ipynb
+```
+
+O objetivo desta implementação é permitir a resolução de problemas de Programação Linear que **não possuem uma base inicial evidente**, especialmente problemas que apresentam restrições do tipo `>=` ou `=` e, consequentemente, necessitam de **variáveis artificiais**.
+
+---
+
+## O que é o Método Simplex das Duas Fases?
+
+O Método Simplex das Duas Fases é uma estratégia utilizada para encontrar uma solução básica viável inicial antes da aplicação do Simplex ao problema original.
+
+O procedimento é dividido em duas etapas:
+
+```text
+Problema de Programação Linear
+             │
+             ▼
+        Construção da
+          Fase I
+             │
+             ▼
+   Introdução de variáveis
+        artificiais
+             │
+             ▼
+       Resolver Fase I
+             │
+       ┌─────┴─────┐
+       │           │
+       ▼           ▼
+    objetivo       objetivo
+     ≠ 0             = 0
+       │              │
+       ▼              ▼
+   Inviável       Problema
+                   viável
+                      │
+                      ▼
+             Remoção das variáveis
+                artificiais
+                      │
+                      ▼
+                Fase II
+                      │
+                      ▼
+             Solução ótima
+```
+
+### Fase I
+
+A primeira fase tem como objetivo determinar se o problema original possui uma solução viável.
+
+Para isso, são introduzidas **variáveis artificiais** nas restrições que necessitam de uma base inicial.
+
+O problema auxiliar da Fase I minimiza a soma das variáveis artificiais:
+
+$$
+\min W = a_1 + a_2 + \cdots + a_k
+$$
+
+onde:
+
+- $a_1,\ldots,a_k$ são as variáveis artificiais;
+- $W$ é a função objetivo auxiliar.
+
+Ao final da Fase I:
+
+$$
+W^* \neq 0
+$$
+
+indica que o problema original é **inviável**.
+
+Por outro lado:
+
+$$
+W^* = 0
+$$
+
+indica que foi encontrada uma solução básica viável para o problema original e que é possível prosseguir para a Fase II.
+
+---
+
+## Fase II
+
+Na Fase II, as variáveis artificiais deixam de fazer parte do problema.
+
+O dicionário obtido ao final da Fase I é utilizado para construir o dicionário inicial da Fase II, agora utilizando novamente a **função objetivo original**.
+
+O Simplex é então executado normalmente até que uma solução ótima seja encontrada.
+
+O fluxo implementado no projeto é:
+
+```text
+P
+│
+▼
+construir_fase_1()
+│
+▼
+construir_forma_padrao_fase_1()
+│
+▼
+Fase I
+│
+├── objetivo ≠ 0 → problema inviável
+│
+└── objetivo = 0
+        │
+        ▼
+expulsar_artificiais_basicas()
+        │
+        ▼
+dicionario_fase_2()
+        │
+        ▼
+Fase II
+        │
+        ▼
+solução ótima
+```
+
+---
+
+## Implementação no SageMath
+
+A implementação utiliza as classes fornecidas pelo módulo:
+
+```python
+from sage.numerical.interactive_simplex_method import (
+    InteractiveLPProblem,
+    InteractiveLPProblemStandardForm,
+    LPDictionary,
+)
+```
+
+A classe principal criada neste projeto é:
+
+```python
+simplex_duas_fases
+```
+
+Ela recebe um problema de Programação Linear construído com `InteractiveLPProblem`.
+
+Exemplo:
+
+```python
+S = simplex_duas_fases(P)
+```
+
+Depois, o processo completo pode ser executado com:
+
+```python
+resultado = S.resolver()
+```
+
+O método `resolver()` executa automaticamente a Fase I e, caso o problema seja viável, prossegue para a Fase II.
+
+---
+
+## Construção da Fase I
+
+O método:
+
+```python
+construir_fase_1()
+```
+
+analisa as restrições do problema original.
+
+São tratados os seguintes tipos:
+
+```text
+<=
+>=
+=
+```
+
+Para uma restrição do tipo `<=`, é adicionada uma variável de folga.
+
+Por exemplo:
+
+$$
+3x_1 + 2x_2 \leq 90
+$$
+
+é transformada em:
+
+$$
+3x_1 + 2x_2 + R_1 = 90
+$$
+
+Para uma restrição do tipo `>=`, é introduzida uma variável de excesso e uma variável artificial:
+
+$$
+3x_1 + 2x_2 \geq 90
+$$
+
+torna-se:
+
+$$
+3x_1 + 2x_2 - R_1 + a_1 = 90
+$$
+
+Para uma igualdade:
+
+$$
+3x_1 + 2x_2 = 90
+$$
+
+é introduzida uma variável artificial:
+
+$$
+3x_1 + 2x_2 + a_1 = 90
+$$
+
+As variáveis artificiais são identificadas e armazenadas pela implementação para que possam ser removidas posteriormente.
+
+---
+
+## Função objetivo da Fase I
+
+Depois da transformação das restrições, a implementação cria um problema auxiliar cujo objetivo é minimizar as variáveis artificiais:
+
+$$
+\min W = a_1+a_2+\cdots+a_k
+$$
+
+As demais variáveis recebem coeficiente zero na função objetivo da Fase I.
+
+Dessa forma, o Simplex procura levar todas as variáveis artificiais para zero.
+
+---
+
+## Verificação da viabilidade
+
+Após a execução do Simplex na Fase I, é analisado o valor da função objetivo auxiliar.
+
+A implementação utiliza:
+
+```python
+self.valor_fase_I = self.D3.objective_value()
+```
+
+Se:
+
+```python
+self.valor_fase_I != 0
+```
+
+o problema original é considerado inviável:
+
+```text
+Problema original inviável.
+```
+
+Se:
+
+```python
+self.valor_fase_I == 0
+```
+
+o problema é considerado viável e a execução prossegue para a Fase II:
+
+```text
+Problema original viável. Siga para a Fase II.
+```
+
+---
+
+## Expulsão das variáveis artificiais
+
+Depois de uma Fase I bem-sucedida, as variáveis artificiais não podem permanecer na base para a resolução do problema original.
+
+Para isso, a implementação utiliza:
+
+```python
+expulsar_artificiais_basicas()
+```
+
+O procedimento procura variáveis não artificiais capazes de entrar na base e realiza o pivotamento necessário.
+
+Uma característica importante da implementação é que uma variável artificial **não é escolhida como variável entrante** durante esse processo.
+
+O objetivo é obter uma base composta somente por variáveis relacionadas ao problema original.
+
+---
+
+## Construção do dicionário da Fase II
+
+Depois da remoção das variáveis artificiais, o método:
+
+```python
+dicionario_fase_2()
+```
+
+constrói o dicionário inicial da Fase II.
+
+Nesse processo:
+
+1. as variáveis artificiais são identificadas;
+2. as artificiais básicas são expulsas da base;
+3. as variáveis artificiais são removidas das variáveis não básicas;
+4. as colunas correspondentes às artificiais são removidas;
+5. a função objetivo original é reconstruída;
+6. o dicionário da Fase II é criado;
+7. são realizadas verificações para garantir que nenhuma variável artificial permaneça.
+
+O resultado é armazenado em:
+
+```python
+self.D4
+```
+
+---
+
+## Execução do Simplex
+
+A implementação utiliza o método:
+
+```python
+simplex_maior_coeficiente()
+```
+
+para realizar as iterações do Simplex.
+
+A variável entrante é escolhida utilizando o critério do **maior coeficiente positivo na função objetivo**.
+
+O procedimento geral é:
+
+```text
+1. Verificar se o dicionário é ótimo
+2. Identificar as variáveis candidatas a entrar
+3. Escolher o maior coeficiente positivo
+4. Identificar a variável que sai
+5. Realizar o pivotamento
+6. Construir o novo dicionário
+7. Repetir até encontrar a solução ótima
+```
+
+O método também possui um limite padrão de:
+
+```python
+max_iter=100
+```
+
+iterações, evitando uma execução indefinida em situações problemáticas.
+
+---
+
+## Exemplo de utilização
+
+Considere um problema de Programação Linear definido no SageMath:
+
+```python
+A = (
+    (1, 1),
+    (2, 1)
+)
+
+b = (4, 5)
+
+c = (3, 2)
+```
+
+O problema pode ser criado utilizando:
+
+```python
+P = InteractiveLPProblem(
+    A,
+    b,
+    c,
+    ["x_1", "x_2"],
+    problem_type="max",
+    constraint_type=["==", ">="],
+    variable_type=[">=", ">="]
+)
+```
+
+A classe das Duas Fases pode então ser instanciada:
+
+```python
+S = simplex_duas_fases(P)
+```
+
+e o problema pode ser resolvido com:
+
+```python
+resultado = S.resolver()
+```
+
+Ao executar o método, são realizadas as seguintes etapas:
+
+```text
+FASE I
+   ↓
+Construção do problema auxiliar
+   ↓
+Introdução das variáveis artificiais
+   ↓
+Simplex da Fase I
+   ↓
+Teste de viabilidade
+   ↓
+Remoção das artificiais
+   ↓
+Construção do dicionário da Fase II
+   ↓
+FASE II
+   ↓
+Simplex
+   ↓
+Solução ótima
+```
+
+---
+
+## Acompanhamento das iterações
+
+A implementação foi desenvolvida com finalidade principalmente didática.
+
+Durante a execução são apresentados os dicionários Simplex e informações sobre as iterações, incluindo:
+
+- dicionário inicial;
+- variável que entra;
+- variável que sai;
+- novo dicionário;
+- valor da função objetivo;
+- resultado da Fase I;
+- indicação de inviabilidade ou continuidade para a Fase II.
+
+Isso permite acompanhar o funcionamento interno do algoritmo, e não apenas obter a solução numérica final.
+
+---
+
+## Arquivos relacionados ao Simplex das Duas Fases
+
+Com a inclusão dessa funcionalidade, o repositório passa a conter os seguintes arquivos principais:
+
+```text
+Tutorial-SageMath-CoCalc-Interactive-Simplex-Method/
+│
+├── LICENSE
+├── README.md
+├── Tutorial_Interactive-Simplex-Method.ipynb
+├── Exemplo_Simplex_Duas_Fases.ipynb
+└── simplex_duas_fases.py
+```
+
+### `Tutorial_Interactive-Simplex-Method.ipynb`
+
+Contém o tutorial relacionado ao **Método Simplex Interativo**, incluindo a adaptação da renderização LaTeX/MathJax no CoCalc.
+
+### `simplex_duas_fases.py`
+
+Contém a implementação do **Método Simplex das Duas Fases**, integrada às estruturas do `interactive_simplex_method`.
+
+### `Exemplo_Simplex_Duas_Fases.ipynb`
+
+Contém exemplos práticos de utilização da implementação das Duas Fases no SageMath.
+
+---
+
+## Relação com o Simplex Interativo
+
+O projeto passa, portanto, a contemplar duas abordagens complementares:
+
+| Funcionalidade | Descrição |
+|---|---|
+| **Simplex Interativo** | Utilização das classes nativas do SageMath e visualização dos dicionários |
+| **Simplex das Duas Fases** | Construção automática de uma base viável utilizando variáveis artificiais |
+| **Renderização LaTeX/MathJax** | Adaptação da apresentação matemática para CoCalc/Jupyter |
+| **Visualização gráfica** | Representação geométrica de problemas de Programação Linear |
+| **Acompanhamento das iterações** | Exibição dos dicionários e operações realizadas pelo Simplex |
+
+A implementação das Duas Fases complementa o tutorial original ao permitir trabalhar com problemas em que a base inicial não pode ser obtida diretamente apenas pela introdução de variáveis de folga.
+
+---
+
+## Observação sobre a implementação
+
+A implementação atual foi desenvolvida para integração com o **SageMath 10.9** e utiliza internamente as classes do módulo:
+
+```python
+sage.numerical.interactive_simplex_method
+```
+
+Ela possui finalidade principalmente **didática e educacional**, permitindo visualizar as etapas envolvidas na construção e resolução de um problema pelo Método Simplex das Duas Fases.
+
+Para aplicações de otimização em produção, recomenda-se utilizar os solucionadores de Programação Linear disponibilizados pelo próprio SageMath.
+
+---
+
+## Resumo do fluxo completo
+
+O projeto agora apresenta o seguinte fluxo conceitual:
+
+```text
+                 PROGRAMAÇÃO LINEAR
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+             ▼                       ▼
+      SIMPLEX INTERATIVO      SIMPLEX DUAS FASES
+             │                       │
+             │                       ▼
+             │                    FASE I
+             │                       │
+             │               ┌───────┴───────┐
+             │               │               │
+             │               ▼               ▼
+             │            W ≠ 0           W = 0
+             │               │               │
+             │               ▼               ▼
+             │           INVIÁVEL         FASE II
+             │                               │
+             │                               ▼
+             │                          SOLUÇÃO ÓTIMA
+             │
+             ▼
+      DICIONÁRIOS SIMPLEX
+             │
+             ▼
+       SOLUÇÃO ÓTIMA
+```
+
+Dessa forma, o repositório reúne tanto a utilização didática do **Simplex Interativo do SageMath** quanto uma implementação própria do **Simplex das Duas Fases**, mantendo o foco na visualização das etapas matemáticas e computacionais do algoritmo.
 
 ---
 
