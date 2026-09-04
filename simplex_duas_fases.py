@@ -67,23 +67,16 @@ class simplex_duas_fases:
         b = P.b()
         c = P.c()
 
-        constraint_types = list(
-            P.constraint_types()
-        )
+        constraint_types = list(P.constraint_types())
 
-        variable_types = list(
-            P.variable_types()
-        )
+        variable_types = list(P.variable_types())
 
-        variaveis = list(
-            P.decision_variables()
-        )
+        variaveis = list(P.decision_variables())
 
         m = P.n_constraints()
         n = P.n_variables()
 
-        nomes = [
-            str(v)
+        nomes = [str(v)
             for v in variaveis
         ]
 
@@ -112,9 +105,7 @@ class simplex_duas_fases:
 
         for i in range(m):
 
-            tipo = str(
-                constraint_types[i]
-            )
+            tipo = str(constraint_types[i])
 
             # -------------------------------------------------
             # <=
@@ -122,15 +113,11 @@ class simplex_duas_fases:
 
             if tipo == "<=":
 
-                nome_R = (
-                    f"R_{contador_R}"
-                )
+                nome_R = (f"R_{contador_R}")
 
                 contador_R += 1
 
-                nomes2.append(
-                    nome_R
-                )
+                nomes2.append(nome_R)
 
                 for linha in A2:
                     linha.append(0)
@@ -143,15 +130,11 @@ class simplex_duas_fases:
 
             elif tipo == ">=":
 
-                nome_R = (
-                    f"R_{contador_R}"
-                )
+                nome_R = (f"R_{contador_R}")
 
                 contador_R += 1
 
-                nomes2.append(
-                    nome_R
-                )
+                nomes2.append(nome_R)
 
                 for linha in A2:
                     linha.append(0)
@@ -164,13 +147,9 @@ class simplex_duas_fases:
 
                 contador_artificial += 1
 
-                nomes2.append(
-                    nome_artificial
-                )
+                nomes2.append(nome_artificial)
 
-                artificiais.append(
-                    nome_artificial
-                )
+                artificiais.append(nome_artificial)
 
                 for linha in A2:
                     linha.append(0)
@@ -266,10 +245,7 @@ class simplex_duas_fases:
             artificiais
         )
 
-        return (
-            self.P2,
-            self.artificiais
-        )
+        return (self.P2,self.artificiais)
 
     # =========================================================
     # CONSTRUIR FORMA PADRÃO DA FASE I
@@ -612,9 +588,7 @@ class simplex_duas_fases:
             # Mostrar dicionário produzido
             # -------------------------------------------------
 
-            show(
-                D_atual
-            )
+            display(D_atual)
 
         return D_atual
 
