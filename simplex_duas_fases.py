@@ -446,7 +446,7 @@ class simplex_duas_fases:
     # ARTIFICIAIS BÁSICAS
     # =========================================================
 
-    def artificiais_basicas( self, D=None, artificiais=None):
+    def artificiais_basicas(self, D=None, artificiais=None):
 
         if D is None:
             D = self.D3
@@ -473,7 +473,7 @@ class simplex_duas_fases:
     # EXPULSAR ARTIFICIAIS BÁSICAS
     # =========================================================
 
-    def expulsar_artificiais_basicas(self, D=None, artificiais=None):
+    def expulsar_artificiais_basicas(self,D=None,artificiais=None):
         """
         Expulsa da base as variáveis artificiais.
 
@@ -622,7 +622,7 @@ class simplex_duas_fases:
     # DICIONÁRIO FASE II
     # =========================================================
 
-    def dicionario_fase_2(self, P, D3, artificiais=None):
+    def dicionario_fase_2(self,P,D3,artificiais=None):
         """
         Constrói o dicionário inicial da Fase II a partir do
         dicionário final da Fase I.
@@ -878,13 +878,204 @@ class simplex_duas_fases:
                 + str(artificiais_restantes)
             )
 
-        print(
-            "\nDicionário inicial da Fase II:"
-        )
+#        print(
+#            "\nDicionário inicial da Fase II:"
+#        )
 
         # show(D4)
 
         return D4
+
+    # =========================================================
+    # SIMPLEX - MAIOR COEFICIENTE POSITIVO
+    # =========================================================
+
+    def simplex_maior_coeficiente(self,P,max_iter=100):
+        """
+        Executa o método Simplex escolhendo como variável
+        entrante aquela que possui o maior coeficiente positivo
+        na função objetivo.
+
+        Critério de entrada:
+
+            maior coeficiente positivo.
+
+        Critério de saída:
+
+            teste da razão mínima, através de
+            possible_leaving().
+
+        Em caso de empate na saída, escolhe a menor variável.
+
+        P pode ser:
+
+            - um InteractiveLPProblemStandardForm;
+            - um LPDictionary.
+        """
+
+        # =====================================================
+        # Obter dicionário inicial
+        # =====================================================
+
+        if isinstance(P, LPDictionary):
+
+            D = P
+
+        else:
+
+            D = P.initial_dictionary()
+
+        print()
+        print("=" * 60)
+        print("DICIONÁRIO INICIAL")
+        print("=" * 60)
+
+        display(D)
+
+        # =====================================================
+        # Iterações
+        # =====================================================
+
+        for k in range(1, max_iter + 1):
+
+            # -------------------------------------------------
+            # Verificar ótimo
+            # -------------------------------------------------
+
+            if D.is_optimal():
+
+#                print()
+#                print(
+#                    "Solução ótima encontrada "
+#                    f"na iteração {k-1}."
+#                )
+
+                break
+
+            # -------------------------------------------------
+            # Variáveis que podem entrar
+            # -------------------------------------------------
+
+            candidatas = D.possible_entering()
+
+            if not candidatas:
+
+                raise ValueError(
+                    "Não existem variáveis candidatas "
+                    "a entrar."
+                )
+
+            # -------------------------------------------------
+            # Variáveis não-básicas
+            # -------------------------------------------------
+
+            variaveis = tuple(
+                D.nonbasic_variables()
+            )
+
+            coeficientes = tuple(
+                D.objective_coefficients()
+            )
+
+            # -------------------------------------------------
+            # Escolher variável com MAIOR coeficiente positivo
+            # -------------------------------------------------
+
+            entrada = max(
+                candidatas,
+                key=lambda v:
+                    coeficientes[
+                        variaveis.index(v)
+                    ]
+            )
+
+            coef_entrada = (
+                coeficientes[
+                    variaveis.index(entrada)
+                ]
+            )
+
+            # -------------------------------------------------
+            # Mostrar informações
+            # -------------------------------------------------
+
+            print()
+            print("=" * 60)
+            print(f"ITERAÇÃO {k}")
+            print("=" * 60)
+
+            print(
+                "Variável que entra:",
+                entrada
+            )
+
+            # -------------------------------------------------
+            # Definir variável entrante
+            # -------------------------------------------------
+
+            D.enter(
+                entrada
+            )
+
+            # -------------------------------------------------
+            # Variáveis que podem sair
+            # -------------------------------------------------
+
+            saidas = D.possible_leaving()
+
+            if not saidas:
+
+                raise ValueError(
+                    f"O problema é ilimitado na direção "
+                    f"da variável {entrada}."
+                )
+
+            # -------------------------------------------------
+            # Escolher variável que sai
+            # -------------------------------------------------
+
+            saida = min(
+                saidas
+            )
+
+            print(
+                "Variável que sai:",
+                saida
+            )
+
+            # -------------------------------------------------
+            # Pivotamento
+            # -------------------------------------------------
+
+            D.leave(
+                saida
+            )
+
+            D.update()
+
+            # -------------------------------------------------
+            # Mostrar novo dicionário
+            # -------------------------------------------------
+
+            print(
+                "\nNovo dicionário:"
+            )
+
+            display(D)
+
+            print(
+                "Valor da função objetivo:",
+                D.objective_value()
+            )
+
+        else:
+
+            raise RuntimeError(
+                "Número máximo de iterações "
+                f"({max_iter}) atingido."
+            )
+
+        return D
 
     # =========================================================
     # VERIFICAR FASE I
@@ -892,17 +1083,25 @@ class simplex_duas_fases:
 
     def verifica_fase_I(self):
 
-        resultado = (
-            self.P3.run_simplex_method()
-        )
+        self.fase = 1
 
-        display(
-            resultado
-        )
+        print("=" * 60)
+        print("FASE I")
+        print("=" * 60)
+
+        # -----------------------------------------------------
+        # Resolver Fase I
+        # -----------------------------------------------------
 
         self.D3 = (
-            self.P3._final_dictionary
+            self.simplex_maior_coeficiente(
+                self.P3
+            )
         )
+
+        # -----------------------------------------------------
+        # Mostrar dicionário final
+        # -----------------------------------------------------
 
         print(
             "\nDicionário final da Fase I:"
@@ -969,7 +1168,9 @@ class simplex_duas_fases:
             "\nProblema da Fase I (P2):"
         )
 
-        display(self.P2)
+        display(
+            self.P2
+        )
 
         # -----------------------------------------------------
         # Construir forma padrão da Fase I
@@ -981,29 +1182,37 @@ class simplex_duas_fases:
         # Resolver Fase I
         # -----------------------------------------------------
 
-        resultado_fase_I = (
-            self.P3.run_simplex_method()
-        )
-
-        # -----------------------------------------------------
-        # Mostrar dicionários da Fase I
-        # -----------------------------------------------------
-
-        display(
-            resultado_fase_I
-        )
-
-        # -----------------------------------------------------
-        # Recuperar D3
-        # -----------------------------------------------------
-
         self.D3 = (
-            self.P3._final_dictionary
+            self.simplex_maior_coeficiente(
+                self.P3
+            )
         )
+
+        # -----------------------------------------------------
+        # Mostrar dicionário final da Fase I
+        # -----------------------------------------------------
+
+#        print(
+#            "\nDicionário final da Fase I:"
+#        )
+
+#        display(self.D3)
+
+        # -----------------------------------------------------
+        # Valor da função objetivo da Fase I
+        # -----------------------------------------------------
 
         self.valor_fase_I = (
             self.D3.objective_value()
         )
+#
+#        print(
+#            "\nValor da função objetivo da Fase I:"
+#        )
+
+#        show(
+#            self.valor_fase_I
+#        )
 
         # =====================================================
         # VERIFICAR VIABILIDADE
@@ -1058,34 +1267,15 @@ class simplex_duas_fases:
         # Resolver Fase II
         # -----------------------------------------------------
 
-        resultado_fase_II = (
-            self.D4.run_simplex_method()
-        )
-
-        # -----------------------------------------------------
-        # Mostrar dicionários da Fase II
-        # -----------------------------------------------------
-
-        display(
-            resultado_fase_II
-        )
-
-        # -----------------------------------------------------
-        # Recuperar dicionário final
-        # -----------------------------------------------------
-
-        if hasattr(
-            self.D4,
-            "_final_dictionary"
-        ):
-
-            self.D4 = (
-                self.D4._final_dictionary
+        self.D4 = (
+            self.simplex_maior_coeficiente(
+                self.D4
             )
+        )
 
-        # =====================================================
-        # RESULTADO
-        # =====================================================
+        # -----------------------------------------------------
+        # Resultado
+        # -----------------------------------------------------
 
         self.resultado = self.D4
 
